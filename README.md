@@ -24,9 +24,24 @@ npm run tauri dev
 CLI mode:
 
 ```powershell
+cd G:\code\McpProxy\src-tauri
+cargo run -- --cli
+cargo run -- --cli --config ..\config.toml
+```
+
+After `cargo build`, the debug executable can also be run directly:
+
+```powershell
 .\src-tauri\target\debug\mcpproxy.exe --cli
 .\src-tauri\target\debug\mcpproxy.exe --cli --config .\config.toml
 ```
+
+CLI mode starts the proxy without the Tauri window and prints the WSL-facing
+SSE and Streamable HTTP URLs. Press `Ctrl+C` to stop it. Use the debug build for
+CLI debugging because it is compiled as a Windows Console executable.
+
+Release builds are compiled as a Windows GUI executable, so double-clicking
+`mcpproxy.exe` starts the tray app without opening a console window.
 
 ## Config
 
@@ -70,13 +85,6 @@ while `/sse` and `/message?...` use the legacy SSE transport.
 
 ```powershell
 .\scripts\build.ps1
-```
-
-The build script sets:
-
-```powershell
-$Env:http_proxy = "http://127.0.0.1:1080"
-$Env:https_proxy = "http://127.0.0.1:1080"
 ```
 
 Current bundle outputs:
