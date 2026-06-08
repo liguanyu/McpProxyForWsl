@@ -16,8 +16,17 @@ bridge.py -> http://172.21.112.1:23333/stream -> Windows McpProxy -> Rider MCP
 
 ## Setup In WSL
 
+From the repository root, copy the bridge directory to your WSL home directory:
+
 ```bash
-cd /mnt/g/code/McpProxy/WslMcpStdioBridge
+mkdir -p ~/WslMcpStdioBridge
+cp -r WslMcpStdioBridge/. ~/WslMcpStdioBridge/
+```
+
+Create the Python environment in the copied directory:
+
+```bash
+cd ~/WslMcpStdioBridge
 uv venv .venv --python python3
 . .venv/bin/activate
 uv pip install -r requirements.txt
@@ -45,7 +54,7 @@ interface does not change.
 Make sure Windows McpProxy is already running, then:
 
 ```bash
-cd /mnt/g/code/McpProxy/WslMcpStdioBridge
+cd ~/WslMcpStdioBridge
 . .venv/bin/activate
 python test_bridge_smoke.py
 ```
@@ -55,14 +64,24 @@ calls `tools/list`. The bridge requests upstream tools every time.
 
 ## Agent Config
 
+For Codex running in WSL, add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.rider-studio]
+command = "bash"
+args = ["-lc", "cd ~/WslMcpStdioBridge && . .venv/bin/activate && python bridge.py"]
+startup_timeout_sec = 20
+tool_timeout_sec = 60
+```
+
 When the agent runs in WSL:
 
 ```json
 {
   "mcpServers": {
     "rider-studio": {
-      "command": "/mnt/g/code/McpProxy/WslMcpStdioBridge/.venv/bin/python",
-      "args": ["/mnt/g/code/McpProxy/WslMcpStdioBridge/bridge.py"]
+      "command": "~/WslMcpStdioBridge/.venv/bin/python",
+      "args": ["~/WslMcpStdioBridge/bridge.py"]
     }
   }
 }
@@ -78,7 +97,7 @@ When the agent runs on Windows and should launch the WSL bridge:
       "args": [
         "bash",
         "-lc",
-        "cd /mnt/g/code/McpProxy/WslMcpStdioBridge && . .venv/bin/activate && python bridge.py"
+        "cd ~/WslMcpStdioBridge && . .venv/bin/activate && python bridge.py"
       ]
     }
   }
@@ -91,4 +110,3 @@ When the agent runs on Windows and should launch the WSL bridge:
 - Logs go to stderr.
 - This bridge only declares and proxies tools for now. It does not declare
   resources or prompts.
-
