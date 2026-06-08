@@ -7,4 +7,5 @@ logs/
 config.toml
 *.msi
 *.exe
-
+WslMcpStdioBridge/.venv/
+WslMcpStdioBridge/__pycache__/
