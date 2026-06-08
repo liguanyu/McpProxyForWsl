@@ -42,6 +42,7 @@ let status: ProxyStatus | null = null;
 let saveTimer: number | undefined;
 let busy = false;
 let lastMessage = "";
+let shellRendered = false;
 
 const fields: Array<keyof AppConfig> = [
   "upstream_base_url",
@@ -57,46 +58,33 @@ const fields: Array<keyof AppConfig> = [
 ];
 
 async function init() {
+  appRoot.innerHTML = `<div class="loading">Loading</div>`;
   config = await invoke<AppConfig>("get_config");
   status = await invoke<ProxyStatus>("get_status");
-  render();
+  renderShellOnce();
+  updateView();
   window.setInterval(refreshStatus, 1500);
 }
 
 async function refreshStatus() {
   try {
     status = await invoke<ProxyStatus>("get_status");
-    render();
+    updateView();
   } catch (error) {
     lastMessage = String(error);
-    render();
+    updateView();
   }
 }
 
-function render() {
+function renderShellOnce() {
+  if (shellRendered) {
+    return;
+  }
+
   if (!config || !status) {
     appRoot.innerHTML = `<div class="loading">Loading</div>`;
     return;
   }
-
-  const streamSnippet = JSON.stringify(
-    {
-      type: "streamable-http",
-      url: status.public_stream_url,
-      headers: {},
-    },
-    null,
-    2,
-  );
-  const sseSnippet = JSON.stringify(
-    {
-      type: "sse",
-      url: status.public_sse_url,
-      headers: {},
-    },
-    null,
-    2,
-  );
 
   appRoot.innerHTML = `
     <section class="shell">
@@ -105,23 +93,20 @@ function render() {
           <h1>McpProxy</h1>
           <p>Rider MCP -> Windows -> WSL</p>
         </div>
-        <div class="status ${status.running ? "running" : "stopped"}">
+        <div class="status" id="statusBadge">
           <span></span>
-          ${status.running ? "Running" : "Stopped"}
         </div>
       </header>
 
       <section class="toolbar">
-        <button id="toggleProxy" class="primary" ${busy ? "disabled" : ""}>
-          ${status.running ? "停止代理" : "启动代理"}
-        </button>
-        <button id="testStreamUpstream" ${busy ? "disabled" : ""}>测试上游 Stream</button>
-        <button id="testSseUpstream" ${busy ? "disabled" : ""}>测试上游 SSE</button>
-        <button id="testStreamProxy" ${busy || !status.running ? "disabled" : ""}>测试代理 Stream</button>
-        <button id="testSseProxy" ${busy || !status.running ? "disabled" : ""}>测试代理 SSE</button>
+        <button id="toggleProxy" class="primary"></button>
+        <button id="testStreamUpstream">测试上游 Stream</button>
+        <button id="testSseUpstream">测试上游 SSE</button>
+        <button id="testStreamProxy">测试代理 Stream</button>
+        <button id="testSseProxy">测试代理 SSE</button>
       </section>
 
-      ${lastMessage ? `<div class="message">${escapeHtml(lastMessage)}</div>` : ""}
+      <div class="message" id="message" hidden></div>
 
       <section class="grid">
         <form class="panel" id="configForm">
@@ -147,26 +132,92 @@ function render() {
         <section class="panel">
           <h2>访问地址</h2>
           <dl class="facts">
-            <dt>上游 Stream</dt><dd>${escapeHtml(status.upstream_stream_url)}</dd>
-            <dt>上游 SSE</dt><dd>${escapeHtml(status.upstream_sse_url)}</dd>
-            <dt>WSL Stream</dt><dd>${escapeHtml(status.public_stream_url)}</dd>
-            <dt>WSL SSE</dt><dd>${escapeHtml(status.public_sse_url)}</dd>
+            <dt>上游 Stream</dt><dd id="upstreamStreamUrl"></dd>
+            <dt>上游 SSE</dt><dd id="upstreamSseUrl"></dd>
+            <dt>WSL Stream</dt><dd id="publicStreamUrl"></dd>
+            <dt>WSL SSE</dt><dd id="publicSseUrl"></dd>
           </dl>
           <h3>Streamable HTTP</h3>
-          <pre>${escapeHtml(streamSnippet)}</pre>
+          <pre id="streamSnippet"></pre>
           <h3>SSE</h3>
-          <pre>${escapeHtml(sseSnippet)}</pre>
+          <pre id="sseSnippet"></pre>
         </section>
       </section>
 
       <section class="panel logs">
         <h2>日志</h2>
-        <pre>${escapeHtml(status.recent_logs.slice(-80).join("\n"))}</pre>
+        <pre id="logsText"></pre>
       </section>
     </section>
   `;
 
+  shellRendered = true;
   bindEvents();
+}
+
+function updateView() {
+  if (!config || !status) {
+    return;
+  }
+
+  renderShellOnce();
+
+  const statusBadge = getElement<HTMLDivElement>("statusBadge");
+  statusBadge.className = `status ${status.running ? "running" : "stopped"}`;
+  statusBadge.innerHTML = `<span></span>${status.running ? "Running" : "Stopped"}`;
+
+  const toggleProxy = getElement<HTMLButtonElement>("toggleProxy");
+  toggleProxy.disabled = busy;
+  toggleProxy.textContent = status.running ? "停止代理" : "启动代理";
+
+  getElement<HTMLButtonElement>("testStreamUpstream").disabled = busy;
+  getElement<HTMLButtonElement>("testSseUpstream").disabled = busy;
+  getElement<HTMLButtonElement>("testStreamProxy").disabled = busy || !status.running;
+  getElement<HTMLButtonElement>("testSseProxy").disabled = busy || !status.running;
+
+  const message = getElement<HTMLDivElement>("message");
+  message.hidden = !lastMessage;
+  message.textContent = lastMessage;
+
+  getElement<HTMLElement>("upstreamStreamUrl").textContent = status.upstream_stream_url;
+  getElement<HTMLElement>("upstreamSseUrl").textContent = status.upstream_sse_url;
+  getElement<HTMLElement>("publicStreamUrl").textContent = status.public_stream_url;
+  getElement<HTMLElement>("publicSseUrl").textContent = status.public_sse_url;
+
+  getElement<HTMLPreElement>("streamSnippet").textContent = JSON.stringify(
+    {
+      type: "streamable-http",
+      url: status.public_stream_url,
+      headers: {},
+    },
+    null,
+    2,
+  );
+  getElement<HTMLPreElement>("sseSnippet").textContent = JSON.stringify(
+    {
+      type: "sse",
+      url: status.public_sse_url,
+      headers: {},
+    },
+    null,
+    2,
+  );
+  updateLogs(status.recent_logs.slice(-80).join("\n"));
+}
+
+function updateLogs(logText: string) {
+  const logsText = getElement<HTMLPreElement>("logsText");
+  const previousScrollTop = logsText.scrollTop;
+  const wasNearBottom =
+    logsText.scrollTop + logsText.clientHeight >= logsText.scrollHeight - 16;
+
+  logsText.textContent = logText;
+
+  if (wasNearBottom) {
+    logsText.scrollTop = logsText.scrollHeight;
+  } else {
+    logsText.scrollTop = previousScrollTop;
+  }
 }
 
 function bindEvents() {
@@ -221,7 +272,7 @@ async function testConnection(transport: string, target: string) {
 
 async function runAction(action: () => Promise<void>) {
   busy = true;
-  render();
+  updateView();
   try {
     await action();
   } catch (error) {
@@ -240,10 +291,10 @@ function scheduleSave() {
       await invoke("save_config", { config });
       lastMessage = "配置已保存";
       status = await invoke<ProxyStatus>("get_status");
-      render();
+      updateView();
     } catch (error) {
       lastMessage = String(error);
-      render();
+      updateView();
     }
   }, 350);
 }
@@ -273,6 +324,14 @@ function checkboxInput(name: keyof AppConfig, label: string) {
       <span>${label}</span>
     </label>
   `;
+}
+
+function getElement<T extends HTMLElement>(id: string) {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Missing #${id}`);
+  }
+  return element as T;
 }
 
 function escapeHtml(value: string) {
