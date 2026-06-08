@@ -7,7 +7,6 @@ type AppConfig = {
   listen_port: number;
   public_host: string;
   public_port: number;
-  primary_transport: string;
   enable_sse: boolean;
   enable_streamable_http: boolean;
   auto_start_proxy: boolean;
@@ -50,7 +49,6 @@ const fields: Array<keyof AppConfig> = [
   "listen_port",
   "public_host",
   "public_port",
-  "primary_transport",
   "enable_sse",
   "enable_streamable_http",
   "auto_start_proxy",
@@ -137,10 +135,6 @@ function render() {
             ${textInput("public_host", "WSL 访问地址")}
             ${numberInput("public_port", "暴露端口")}
           </div>
-          ${selectInput("primary_transport", "主传输", [
-            ["streamable-http", "streamable-http"],
-            ["sse", "sse"],
-          ])}
           <div class="checks">
             ${checkboxInput("enable_streamable_http", "启用 Streamable HTTP")}
             ${checkboxInput("enable_sse", "启用 SSE")}
@@ -268,23 +262,6 @@ function numberInput(name: keyof AppConfig, label: string) {
     <label>
       <span>${label}</span>
       <input name="${name}" type="number" min="1" max="65535" value="${escapeAttr(String(config?.[name] ?? ""))}" />
-    </label>
-  `;
-}
-
-function selectInput(name: keyof AppConfig, label: string, options: Array<[string, string]>) {
-  const current = String(config?.[name] ?? "");
-  return `
-    <label>
-      <span>${label}</span>
-      <select name="${name}">
-        ${options
-          .map(
-            ([value, text]) =>
-              `<option value="${escapeAttr(value)}" ${current === value ? "selected" : ""}>${escapeHtml(text)}</option>`,
-          )
-          .join("")}
-      </select>
     </label>
   `;
 }

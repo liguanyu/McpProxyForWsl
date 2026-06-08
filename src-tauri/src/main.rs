@@ -40,8 +40,6 @@ struct CliArgs {
     no_gui: bool,
     #[arg(long)]
     config: Option<PathBuf>,
-    #[arg(long)]
-    transport: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +49,6 @@ struct AppConfig {
     listen_port: u16,
     public_host: String,
     public_port: u16,
-    primary_transport: String,
     enable_sse: bool,
     enable_streamable_http: bool,
     auto_start_proxy: bool,
@@ -67,7 +64,6 @@ impl Default for AppConfig {
             listen_port: 23333,
             public_host: "172.21.112.1".to_string(),
             public_port: 23333,
-            primary_transport: "streamable-http".to_string(),
             enable_sse: true,
             enable_streamable_http: true,
             auto_start_proxy: true,
@@ -196,7 +192,7 @@ fn main() {
 }
 
 async fn run_cli(args: CliArgs) -> Result<()> {
-    let runtime = create_runtime(args.config.clone(), args.transport.clone()).await?;
+    let runtime = create_runtime(args.config.clone()).await?;
     start_proxy_runtime(runtime.clone()).await?;
     let config = runtime.config.read().await.clone();
     println!("McpProxy running");
@@ -210,7 +206,7 @@ async fn run_cli(args: CliArgs) -> Result<()> {
 
 fn run_gui(args: CliArgs) {
     let runtime_result =
-        tauri::async_runtime::block_on(create_runtime(args.config.clone(), args.transport.clone()));
+        tauri::async_runtime::block_on(create_runtime(args.config.clone()));
     let runtime = match runtime_result {
         Ok(runtime) => runtime,
         Err(error) => {
@@ -363,14 +359,10 @@ async fn test_connection(
         .map_err(stringify_error)
 }
 
-async fn create_runtime(config_arg: Option<PathBuf>, transport: Option<String>) -> Result<Arc<AppRuntime>> {
+async fn create_runtime(config_arg: Option<PathBuf>) -> Result<Arc<AppRuntime>> {
     let cwd = std::env::current_dir().context("failed to read current directory")?;
     let config_path = config_arg.unwrap_or_else(|| cwd.join("config.toml"));
-    let mut config = load_or_create_config(&config_path)?;
-    if let Some(transport) = transport {
-        config.primary_transport = normalize_transport(&transport)?;
-        save_config_to_path(&config_path, &config)?;
-    }
+    let config = load_or_create_config(&config_path)?;
     let logger = AppLogger::new(cwd);
     Ok(Arc::new(AppRuntime {
         config_path,
@@ -676,7 +668,6 @@ fn validate_config(config: &AppConfig) -> Result<()> {
     if config.listen_port == 0 || config.public_port == 0 {
         return Err(anyhow!("ports must be greater than 0"));
     }
-    normalize_transport(&config.primary_transport)?;
     if !config.enable_sse && !config.enable_streamable_http {
         return Err(anyhow!("at least one transport must be enabled"));
     }

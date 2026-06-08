@@ -26,8 +26,6 @@ CLI mode:
 ```powershell
 .\src-tauri\target\debug\mcpproxy.exe --cli
 .\src-tauri\target\debug\mcpproxy.exe --cli --config .\config.toml
-.\src-tauri\target\debug\mcpproxy.exe --cli --transport streamable-http
-.\src-tauri\target\debug\mcpproxy.exe --cli --transport sse
 ```
 
 ## Config
@@ -40,7 +38,6 @@ listen_host = "0.0.0.0"
 listen_port = 23333
 public_host = "172.21.112.1"
 public_port = 23333
-primary_transport = "streamable-http"
 enable_sse = true
 enable_streamable_http = true
 auto_start_proxy = true
@@ -66,6 +63,8 @@ wsl.exe sh -lc "curl -k -N --max-time 5 http://172.21.112.1:23333/sse"
 ```
 
 For Streamable HTTP, send an MCP `initialize` request to `/stream`.
+The proxy routes by request path automatically: `/stream` uses Streamable HTTP,
+while `/sse` and `/message?...` use the legacy SSE transport.
 
 ## Build
 
@@ -84,4 +83,3 @@ Current bundle outputs:
 
 - `src-tauri\target\release\bundle\msi\McpProxy_0.1.0_x64_en-US.msi`
 - `src-tauri\target\release\bundle\nsis\McpProxy_0.1.0_x64-setup.exe`
-
